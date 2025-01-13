@@ -1,0 +1,58 @@
+name: Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_name:
+        description: "Kernel name (e.g., linux-6.6.66)"
+        required: true
+        default: "linux-6.6.66"
+      kernel_url:
+        description: "Kernel URL (optional)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev wget xz-utils
+
+    - name: Prepare kernel source
+      run: |
+        if [ -z "${{ inputs.kernel_url }}" ]; then
+          KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v${{ inputs.kernel_name:5:1 }}.x/${{ inputs.kernel_name }}.tar.xz"
+          echo "No URL provided, automatically determined URL: $KERNEL_URL"
+        else
+          KERNEL_URL="${{ inputs.kernel_url }}"
+          echo "Using provided URL: $KERNEL_URL"
+        fi
+
+        wget -O "${{ inputs.kernel_name }}.tar.xz" "$KERNEL_URL"
+        tar -xf "${{ inputs.kernel_name }}.tar.xz"
+
+    - name: Configure kernel
+      run: |
+        cd "${{ inputs.kernel_name }}"
+        cp $GITHUB_WORKSPACE/.config .
+        make KCONFIG_ALLCONFIG=/dev/null oldconfig
+
+    - name: Build kernel
+      run: |
+        cd "${{ inputs.kernel_name }}"
+        make -j$(nproc)
+        mkdir -p $GITHUB_WORKSPACE/output
+        cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/output/${{ inputs.kernel_name }}.bzImage"
+
+    - name: Upload bzImage
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ inputs.kernel_name }}.bzImage
+        path: output/
