@@ -19,7 +19,7 @@ jobs:
     steps:
     # 检出代码
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # 安装编译依赖和 wget
     - name: Install dependencies
@@ -30,7 +30,6 @@ jobs:
     # 确定内核链接并下载源码
     - name: Prepare kernel source
       run: |
-        # 使用 bash 提取内核主版本号
         kernel_name="${{ inputs.kernel_name }}"
         if [ -z "${{ inputs.kernel_url }}" ]; then
           major_version=$(echo "$kernel_name" | cut -d '.' -f 1 | grep -o '[0-9]*$')
@@ -41,28 +40,27 @@ jobs:
           echo "Using provided URL: $KERNEL_URL"
         fi
 
-        # 下载并解压
         wget -O "${kernel_name}.tar.xz" "$KERNEL_URL"
         tar -xf "${kernel_name}.tar.xz"
 
     # 使用仓库中的 .config 文件配置内核
     - name: Configure kernel
       run: |
-        cd "${{ inputs.kernel_name }}"  # 进入解压目录
-        cp $GITHUB_WORKSPACE/.config .  # 使用仓库中的 .config 文件
+        cd "${{ inputs.kernel_name }}"
+        cp $GITHUB_WORKSPACE/.config .
         make KCONFIG_ALLCONFIG=/dev/null oldconfig
 
     # 编译内核
     - name: Build kernel
       run: |
-        cd "${{ inputs.kernel_name }}"  # 进入解压目录
-        make -j$(nproc)  # 使用所有可用 CPU 核心编译
+        cd "${{ inputs.kernel_name }}"
+        make -j$(nproc)
         mkdir -p $GITHUB_WORKSPACE/output
-        cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/output/${{ inputs.kernel_name }}.bzImage"  # 复制结果并命名
+        cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/output/${{ inputs.kernel_name }}.bzImage"
 
     # 上传生成的 bzImage 文件
     - name: Upload bzImage
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.kernel_name }}.bzImage
         path: output/
